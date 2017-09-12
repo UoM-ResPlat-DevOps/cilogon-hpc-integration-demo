@@ -1,5 +1,5 @@
 FROM jbasney/globus
-RUN yum -y update && yum -y install git wget \
+RUN yum -y update && yum -y install git wget python-setuptools \
     && yum clean all
 
 # Install Let's Encrypt and it's CA certificates (but don't request certificate yet).
@@ -16,3 +16,7 @@ RUN cp cilogon-ca/certificates/* /etc/grid-security/certificates/
 
 # Create globus directory where our user certificate will live (mount this to certificate on host)
 RUN mkdir /root/.globus
+
+# The following is for our web app, which can you replace with your own.
+RUN yum -y install epel-release && yum clean all
+RUN yum -y python-pip

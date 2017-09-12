@@ -1,0 +1,5 @@
+gunicorn
+flask
+requests-oauthlib
+flask-login
+flask_sqlalchemy

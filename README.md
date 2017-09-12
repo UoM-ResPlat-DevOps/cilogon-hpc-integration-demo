@@ -132,6 +132,41 @@ Again, we provide a simple Docker container as an example. Unlike the server, yo
 `gsissh -p 2222 test-user@myhost.com`
 
 
+## Deploying demo web app
+This is a simple web app (based on Flask) that exercises the above, allowing you to start a program on a remote host, authenticating via certificates obtained from CILogon.
+
+1. 
+
+`sudo docker run  -v ~/my_certificate.p12:/root/.globus/usercred.p12 -p 4000:4000 uomcilogon/demo_app`
+
+
+To run with code located outside container (for live development), run within `example_client_app` folder:
+
+`docker run  -v ~/my_certificate.p12:/root/.globus/usercred.p12 -p 4000:4000 -v $(pwd)/app:/srv/app/ -it uomcilogon/demo_app bash`
+
+base oauth2 cilogon workflow on:
+
+http://bitwiser.in/2015/09/09/add-google-login-in-flask.html
+
+
+start with `sudo docker run -it -p 443:4000 -e CLIENT_SECRET=... uomcilogon/demo_app bash`
+
+create initial database with
+```
+cd /srv/app/
+python
+from app import db
+db.create_all() # does this overwrite if existing database?
+```
+
+create self signed certs (todo: switch to let's encrypt)
+
+`openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /selfsigned.key -out /selfsigned.crt`
+
+and then run with `start.sh`
+
+
+
 # Troubleshooting
 
 * Use debug option when creating proxy certificate to make sure paths and permissions are correct `grid-proxy-init -debug`
