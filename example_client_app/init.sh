@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Create self-signed keys for TLS - TODO: replace with Let's Encrypt
-openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /selfsigned.key -out /selfsigned.crt -subj "/C=AU/ST=A/L=A/O=A/CN=A"
+# Get TLS certificate -- might prompt you whether to re-use or create new if already exists.
+./get_host_cert.sh $EMAIL $CLIENT_URL $CLIENT_URL_SECONDARY
 
 # Create database
 cd /srv/app
 python -c "from app import db;db.create_all()"
+

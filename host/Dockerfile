@@ -19,11 +19,9 @@ COPY sshd_config /etc/gsissh/sshd_config
 
 # Utility for setting up host certificate once container up
 COPY get_host_cert.sh /get_host_cert.sh
-RUN chmod +x get_host_cert.sh
 
 # ... and wrapper for kicking off gsisshd
 COPY start_host.sh /start_host.sh
-RUN chmod +x start_host.sh
 
 # An example user that we might want our client to login as via certificate
 RUN adduser test-user

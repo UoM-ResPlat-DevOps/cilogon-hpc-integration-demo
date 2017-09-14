@@ -131,43 +131,7 @@ Again, we provide a simple Docker container as an example. Unlike the server, yo
 
 `gsissh -p 2222 test-user@myhost.com`
 
-
-## Deploying demo web app
-This is a simple web app (based on Flask) that exercises the above, allowing you to start a program on a remote host, authenticating via certificates obtained from CILogon.
-
-1. 
-
-`sudo docker run  -v ~/my_certificate.p12:/root/.globus/usercred.p12 -p 4000:4000 uomcilogon/demo_app`
-
-
-To run with code located outside container (for live development), run within `example_client_app` folder:
-
-`docker run  -v ~/my_certificate.p12:/root/.globus/usercred.p12 -p 4000:4000 -v $(pwd)/app:/srv/app/ -it uomcilogon/demo_app bash`
-
-base oauth2 cilogon workflow on:
-
-http://bitwiser.in/2015/09/09/add-google-login-in-flask.html
-
-
-start with `sudo docker run -it -p 443:4000 -e CLIENT_SECRET=... uomcilogon/demo_app bash`
-
-create initial database with
-```
-cd /srv/app/
-python
-from app import db
-db.create_all() # does this overwrite if existing database?
-```
-
-create self signed certs (todo: switch to let's encrypt)
-
-`openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /selfsigned.key -out /selfsigned.crt`
-
-and then run with `start.sh`
-
-
-
-# Troubleshooting
+# Troubleshooting gsissh
 
 * Use debug option when creating proxy certificate to make sure paths and permissions are correct `grid-proxy-init -debug`
 * Try kicking off the host manually with `/sbin/gsisshd -debug`, which will let you know where things are going wrong. Similarly on client side, use `-v` for more verbose debugging (adding extra `v`'s as needed to increase verbosity).
@@ -179,7 +143,25 @@ This repository includes a simple example web app that can kick off a HPC job on
 
 It's intended to be a launching point for your own science app, rather than a useful tool in of itself!
 
-Live demo here.
+Live demo: https://cilogon-demoapp.solveij.com/
 
-(instructions on kicking off your own instance)
 
+### Deploying demo web app
+This is a simple web app (based on Flask) that exercises the above, allowing you to start a program on a remote host, authenticating via certificates obtained from CILogon.
+
+1. First, you need to define a config file on your host based on `env.list.example`, where: 
+
+* `SECRET_KEY` is created with `python -c "import os; print(os.urandom(24).encode('hex'))"` 
+* `CLIENT_SECRET` and `CLIENT_ID` are as issued to you upon registering a client with CILogon (https://cilogon.org/oauth2/register)
+* `CLIENT_URL` is the URL where your app resides (for callbacks and requesting certificates). 
+* `CLIENT_URL_SECONDARY` is another URL where your app resides, for example where your cloud provider has an existing URL for your host.
+* `EMAIL` is a contact email for whoever owns/manages app for certificate purposes.
+
+
+2. Next, we'll pull container, and setup certificates and database, persisting them outside container.
+
+`sudo docker run -it -p 443:443 -v ~/letsencrypt-certs:/etc/letsencrypt -v ~/app-db:/var/db --env-file env.list uomcilogon/demo_app ./init.sh`
+
+3. Finally, we can kick off web server. Make sure your host has incoming connections to port 443 enabled, and that you're using https://... to access your host.
+
+`sudo docker run -it -p 443:443 -v ~/letsencrypt-certs:/etc/letsencrypt -v ~/app-db:/var/db --env-file env.list uomcilogon/demo_app ./start.sh`
