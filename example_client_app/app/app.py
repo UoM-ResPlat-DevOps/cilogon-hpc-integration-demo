@@ -42,15 +42,15 @@ login_manager.session_protection = "basic"  # Using 'strong' for this will hash 
                                             # -- which wreaks havoc with UniWireless which rapidly shifts
                                             # internet-facing IP addresses via NAT
 
-# Simple sqlite database for our app.
-# All it does it manage a list of users and their OAuth2 tokens.
+# Simple sqlite database for our app - all it does it manage a list of users and their OAuth2 tokens.
 db = SQLAlchemy(app)
 
 
-# Landing Page
 @app.route('/')
 def index():
-
+    """
+    Landing Page View
+    """
     cert_subject = ''
 
     if current_user.is_authenticated:
@@ -59,9 +59,13 @@ def index():
 
     return render_template('app.html', cert_subject=cert_subject)
 
-# Login View - simply provides a link directing us to CILogon
+
 @app.route('/login')
 def login():
+    """
+    Login View
+    Just a page that directs us to CILogon
+    """
     if current_user.is_authenticated:
         return redirect(url_for('index'))
     cilogon = get_cilogon_auth()
@@ -73,17 +77,25 @@ def login():
 @app.route('/logout')
 @login_required
 def logout():
+    """
+    Logout View
+    """
     logout_user()
     return redirect(url_for('index'))
+
 
 
 @app.route('/run', methods=['POST'])
 @login_required
 def run_remote_command():
+    """
+    Run Command View
+    Intended for use via AJAX 
+    """
     command = request.form.get('command')
 
     cert_file = create_proxy_certificate_for_user(current_user)
-    command = ['gsissh', '115.146.85.193', '-p', '2222', command]
+    command = ['gsissh', config.HOST_URL, '-p', '2222', command]
 
     try:
         output = subprocess.check_output(command, env={'X509_USER_PROXY': cert_file}, stderr=subprocess.STDOUT)
@@ -93,9 +105,13 @@ def run_remote_command():
     return output
 
 
-# This is where CILogon redirects user once they have been authenticated (or not)
 @app.route('/callback')
 def callback():
+    """
+    CILogon Callback View
+    This is where CILogon redirects user once they have been authenticated (or not)
+    """
+
     # Redirect user to home page if already logged in.
     if current_user is not None and current_user.is_authenticated:
         return redirect(url_for('index'))
@@ -126,7 +142,10 @@ def callback():
 
 
 def get_user_info(cilogon):
-
+    """
+    Get user metadata from CILogon
+    We fetch email and first name, but others may be available as well depending on identity provider.
+    """
     resp = cilogon.get(Auth.USER_INFO)
 
     print('get_user_info', resp)
@@ -152,6 +171,11 @@ def get_user_info(cilogon):
 
 
 def get_cert(user, cilogon):
+    """
+    Fetch a certificate from CILogon and store in our database.
+    We have to create a certificate signing request (CSR) first which gets signed by CILogon.
+    Appears we can only request a certificate once per CILogon session, have to re-login to get new one.
+    """
     key, csr = get_csr()
 
     u = cilogon.post(Auth.CERT_URL, params={'client_id':Auth.CLIENT_ID,
@@ -160,9 +184,7 @@ def get_cert(user, cilogon):
 
     if u.ok:
         # Save certificate and private key in DB for use later
-        # TODO: Think carefully about best practice here... should we encrypt in situ with another key? Blow away all keys regularly when session old?
-
-        # TODO: Or immediately create proxy cert and save this instead for use during session? Can make that certificate only have say 1hr validity (default is 12).
+        # TODO: An alternative is to generate a proxy certificate and save that here instead, discarding original.
         user.key = key
         user.cert = u.content
         db.session.add(user)
@@ -172,8 +194,11 @@ def get_cert(user, cilogon):
         raise RuntimeError("Error requesting certificate.")
 
 
-
 def get_csr():
+    """
+    Create certificate signing request (CSR) that is accepted by CILogon
+    """
+
     # Generate private key
     key = rsa.generate_private_key(
         public_exponent=65537,
@@ -195,13 +220,13 @@ def get_csr():
     key = key.private_bytes(encoding=serialization.Encoding.PEM,
                             format=serialization.PrivateFormat.TraditionalOpenSSL,
                             encryption_algorithm=serialization.NoEncryption())
-
     return key, csr
 
 
 def get_certificate_subject(cert):
     """
-    Parse plain text certificate, extract subject, and format as per that used in GSISSH.
+    Parse plain text certificate, extract subject, and format as per that used in GSISSH
+    e.g. "/DC=org/DC=cilogon/CN=US/O=Google/CN=Some Person A123456"
     """
     abbreviations = {'domainComponent': 'DC', 'countryName': 'CN', 'organizationName': 'O', 'commonName': 'CN'}
 
@@ -231,6 +256,8 @@ def create_proxy_certificate_for_user(user):
     key_file.flush()
 
     # Resulting proxy cert -- this is retained
+    # TODO: Should periodically purge proxy certificates (say 12h after creation).
+    # Can also reuse proxy cert rather than creating new one for each command.
     proxy_cert_file = tempfile.NamedTemporaryFile(delete=False)
 
     # Create proxy certificate
@@ -245,14 +272,19 @@ def create_proxy_certificate_for_user(user):
     return proxy_cert_file.name
 
 
-# Hook between our user model and flask_login
 @login_manager.user_loader
 def load_user(user_id):
+    """
+    Needed by flask_login library to link to our user model.
+    """
     return User.query.get(int(user_id))
 
 
-# User model -- could also include things like identity provider, institution, etc.
 class User(db.Model, UserMixin):
+    """
+    User Model
+    Could also include things like identity provider, institution, etc. and other items needed for app.
+    """
     __tablename__ = "users"
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(100), unique=True, nullable=False)
@@ -263,11 +295,15 @@ class User(db.Model, UserMixin):
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow())
 
 
-# Get OAuth2 object we can work with.
-# 1) If we already have a token, use it.
-# 2) If we've authenticated but haven't yet fetched token, advance to next stage in auth.
-# 3) If we've done neither, kick of authentication flow from scratch.
 def get_cilogon_auth(state=None, token=None):
+    """
+    Create and return OAuth2 session object.
+    
+    1) If we already have a token (i.e. have active session), use it to instantiate.
+    2) If we've authenticated but haven't yet fetched token, advance to next stage in auth.
+    3) If we've done neither, kick off authentication flow from scratch. 
+    """
+
     if token:
         return OAuth2Session(Auth.CLIENT_ID, token=token)
 

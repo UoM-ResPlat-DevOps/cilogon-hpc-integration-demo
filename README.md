@@ -15,15 +15,6 @@ CILogon provide a hosted service that joins institutional identity providers (in
 
 Not that the user needs to be aware of any of this; in the ideal case, they simply link their HPC account via it's user management GUI, and log into your app using their local institution credentials.
 
-# Jargon
-
-Distinguished Name (DN)
-User Certificate
-Host Certificate
-Certificate Authority
-GSI
-OAuth2
-
 
 ## Example Workflow
 
@@ -139,15 +130,17 @@ Again, we provide a simple Docker container as an example. Unlike the server, yo
 
 ## Demonstration
 
-This repository includes a simple example web app that can kick off a HPC job on behalf of a user via CILogon. It's built with plain 'ol jQuery/Boostrap on the frontend, and using Flask, a simple Python web framework, on the backend.
+This repository includes a simple example web app that can run arbitrary commands on behalf of a user using CILogon. It's built with plain 'ol jQuery/Boostrap on the frontend, and using Flask, a simple Python web framework, on the backend. 
 
-It's intended to be a launching point for your own science app, rather than a useful tool in of itself!
+It's intended to be a launching point for your own app, rather than a useful tool in of itself!
 
-Live demo: https://cilogon-demoapp.solveij.com/
+Live demo: https://cilogon-demoapp.solveij.com/ 
+
+Note that you'll have to request linkage of your certificate identity with a host user account to run any commands!
 
 
 ### Deploying demo web app
-This is a simple web app (based on Flask) that exercises the above, allowing you to start a program on a remote host, authenticating via certificates obtained from CILogon.
+This is a simple web app (based on Flask) that exercises the above, allowing you to run a command on a remote host and return the results, authenticating via certificates obtained from CILogon.
 
 1. First, you need to define a config file on your host based on `env.list.example`, where: 
 
@@ -155,6 +148,7 @@ This is a simple web app (based on Flask) that exercises the above, allowing you
 * `CLIENT_SECRET` and `CLIENT_ID` are as issued to you upon registering a client with CILogon (https://cilogon.org/oauth2/register)
 * `CLIENT_URL` is the URL where your app resides (for callbacks and requesting certificates). 
 * `CLIENT_URL_SECONDARY` is another URL where your app resides, for example where your cloud provider has an existing URL for your host.
+* `HOST_URL` is where your gsissh-enabled host resides which we will be executing commands on.
 * `EMAIL` is a contact email for whoever owns/manages app for certificate purposes.
 
 
@@ -165,3 +159,5 @@ This is a simple web app (based on Flask) that exercises the above, allowing you
 3. Finally, we can kick off web server. Make sure your host has incoming connections to port 443 enabled, and that you're using https://... to access your host.
 
 `sudo docker run -it -p 443:443 -v ~/letsencrypt-certs:/etc/letsencrypt -v ~/app-db:/var/db --env-file env.list uomcilogon/demo_app ./start.sh`
+
+You can troubleshoot by calling bash in the container instead, kicking off `./start.sh` manually and monitoring the log output.

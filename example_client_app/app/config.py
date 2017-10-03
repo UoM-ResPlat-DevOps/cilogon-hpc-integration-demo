@@ -15,6 +15,7 @@ class Auth:
 class Config:
     APP_NAME = "CILogon Demo App"
     SECRET_KEY = os.environ['SECRET_KEY']
+    HOST_URL = os.environ['HOST_URL']
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     DEBUG = False
     SQLALCHEMY_DATABASE_URI = 'sqlite:////var/db/database.db'
